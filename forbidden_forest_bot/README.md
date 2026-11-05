@@ -1,69 +1,47 @@
-# The Forbidden Forest — Discord event bot
+# The Forbidden Forest — Strategic Edition
 
-A standalone Python `discord.py` bot for a 72-hour, 40-encounter autumn adventure competition.
+Standalone Python `discord.py` bot. Do not replace your SS Knowledge Showdown bot with this project; use a separate Railway service or repository.
 
-## Dates (UTC/GMT)
-- Opens automatically: **8 November 2026 at 00:00 GMT**
-- Closes automatically: **11 November 2026 at 00:00 GMT**
-- If a prize-position tie survives the published secondary criteria, a five-encounter tiebreaker opens automatically, closing **12 November 2026 at 00:00 GMT**.
+## Install
 
-The bot must be running to post announcements; if it was offline, it catches up when restarted. Game action deadlines are always checked against UTC time, not just the background scheduler.
+1. Upload **the contents of this folder** to the root of a new GitHub repository (so `bot.py` and `requirements.txt` are at the root). Alternatively set Railway Root Directory to the folder containing them.
+2. Railway service variables: `DISCORD_TOKEN`, `GUILD_ID`, `EVENT_CHANNEL_ID`, `ROLE_ID=1567982021106602065`, `HOST_IDS=1501587787294703657`, and `DATABASE_PATH=/data/forest.sqlite3`.
+3. **Attach a Railway persistent volume mounted at `/data`.** Without it, player data can disappear after deployment. Run **one replica only**; SQLite is not safe for multiple writers in separate containers.
+4. Set custom start command to `python bot.py`. If a previous project still references `SSKnowledge.py`, remove that old start command and Procfile.
+5. In Discord Developer Portal enable **Server Members Intent**. Grant the bot **Manage Roles**, **Add Reactions**, **Read Message History**, **Send Messages**, **Embed Links**, **Attach Files**, **Use Application Commands** and **View Channel**. Put the bot's highest role above the target role.
+6. Run `/forest panel` in the event channel. Users react 🍁 for the supplied role.
+7. Before the event, use `/forest test` and `/forest testreset` to test a separate host-only adventure. Test progress never counts for prizes.
 
-## Prizes
-- First: **125c + HC Box**
-- Second: **75c + HC Box**
-- Third: **50c + HC Box**
+## Dates
 
-## Setup
-1. Create a new Discord application and bot at the Discord Developer Portal. Copy its token.
-2. Enable **Server Members Intent** in the Developer Portal.
-3. Invite the bot with `bot` and `applications.commands` scopes. Grant **View Channel, Send Messages, Embed Links, Attach Files, Add Reactions, Read Message History, Manage Roles, Mention @everyone/@here/All Roles** (where you intend to use it).
-4. In the server's role hierarchy, place the bot's highest role **above** SS Quiz (`1567982021106602065`).
-5. Copy `.env.example` to `.env`, fill `DISCORD_TOKEN`, `GUILD_ID`, and `EVENT_CHANNEL_ID` (the event announcements channel). `HOST_IDS` includes `1501587787294703657` by default.
-6. Install dependencies: `pip install -r requirements.txt`. Start with `python bot.py`.
-7. In Discord, run `/forest panel` in the signup channel. This posts the graphic and a real `@everyone` message and adds the 🍁 reaction.
-8. **No manual start command needed.** At the scheduled opening, the bot posts a `Begin / Resume Adventure` button in `EVENT_CHANNEL_ID`, and players can also use `/forest play`.
+- Main opens: **8 November 2026, 00:00 GMT**.
+- Main closes: **11 November 2026, 00:00 GMT** (72 hours).
+- Tiebreaker window, if required: **11 November 00:00 – 12 November 00:00 GMT**.
+- The scheduler checks every 30 seconds and reconciles missed transitions after restart. Actual Discord announcement delivery depends on the bot being online.
 
-## Railway
-Connect a GitHub repository with these files. Set the variables from `.env.example` in Railway's Variables section. Use a **persistent Railway volume** mounted at `/data`, with `DATABASE_PATH=/data/forest.sqlite3`. The supplied `railway.json` starts the worker. **Run exactly one instance**; multiple instances using separate SQLite files will corrupt the fairness of the competition. Keep the bot online for the full event and tiebreaker. Do not commit `.env` or the database.
+## Gameplay
+
+40 encounters with identical encounter-type quotas for every player, shuffled per-player. All choice costs/outcomes are disclosed; there are no random hidden success rolls. Each player has one official run, plus host-only separate test mode. Adventures can be resumed using `/forest resume` after a button expires or the bot restarts.
+
+Resources: health 100, energy 100, supplies 5, one potion. At encounter 11 choose one talent: Scout (next encounter preview), Guardian (5 less damage), Collector (+10 relic points). Rest at camps, use potions, forage, or use `/forest recover` up to twice (1 supply for 20 energy). **There is no time-based regeneration.**
+
+Score caps: artefacts 1,000, objectives 300 (explore four times; take four demanding routes; collect three distinct artefact types), strategic challenges 200, escape 150, remaining health/energy 100. Maximum 1,750. Escape at 20, 30 or 35 encounters or complete all 40 alive. Defeat or not finishing by deadline forfeits 25% of artefact points and loses escape/resource bonuses.
+
+Ties: final score, artefact points, completed objectives, remaining health + energy. If prize-position ties remain, eligible players complete the same five strategic questions during the following 24 hours; highest correct answers wins. If still tied, a **published deterministic hash of user ID and event name** provides a final non-speed-based fallback. This final fallback is deterministic, not a random audited draw.
+
+Prizes: first 125c + HC Box; second 75c + HC Box; third 50c + HC Box.
 
 ## Commands
 
-Player commands:
-- `/forest help`: full rules, scoring, prizes, tiebreaker and command guide
-- `/forest play`: start or resume an adventure
-- `/forest resume`: reopen your saved adventure
-- `/forest status`: current health, energy, supplies, step and status
-- `/forest inventory`: current artefact count and points
-- `/forest escape`: end early and secure all collected points
-- `/forest leaderboard`: published standings once the event and any bonus expedition finish
+Player: `/forest help`, `/forest play`, `/forest resume`, `/forest status`, `/forest inventory`, `/forest recover`, `/forest leaderboard`, `/forest tiebreaker` (eligible players only).
 
-Host-only (only `HOST_IDS`, including `1501587787294703657`):
-- `/forest panel`: post the graphic, `@everyone` call and 🍁 reaction role signup
-- `/forest dashboard`: live participation totals
-- `/forest logs`: recent recorded actions
-- `/forest player`: inspect an individual participant
-- `/forest audit`: basic data-integrity checks and draw commitment
+Host: `/forest panel`, `/forest dashboard`, `/forest logs`, `/forest audit`, `/forest test`, `/forest testreset`.
 
-## Gameplay and fairness
-- One official adventure per Discord user ID, stored persistently. Players must have the SS Quiz role when **starting**.
-- Every main run has exactly five encounters from each of eight categories, shuffled per player; event descriptions and risk outcomes are seeded individually.
-- Each encounter offers the same three choices: Careful (guaranteed 1x reward), Explore (75% chance for 2x), Gamble (45% chance for 4x). Each costs energy; failures damage health. Energy recovers by 12 per encounter. A player with insufficient energy automatically rests, using one supply if available.
-- Reward size increases at fixed encounter milestones for **every** player. A success also awards an artefact. The inventory lists collected artefact names and counts. Score is calculated from rewards, not a separately editable inventory field.
-- Players may escape at any time before the deadline to bank their points. At 40 encounters, a living player banks automatically. Reaching 0 health banks half the accumulated points. An unfinished living run at the 72-hour deadline is automatically banked.
-- Public scores are hidden until final results. The host dashboard and logs are private/ephemeral.
-- Ranking: secured points, artefact count, remaining health, remaining energy. Only ties affecting the top three positions trigger the automatic five-encounter bonus expedition. Bonus ranking: bonus score, bonus objectives, bonus health, least energy spent. Remaining exact ties are decided by a deterministic, precommitted draw; the commitment is visible in `/forest audit` and the secret is revealed at finalisation.
-- Every button checks user ID, current step, stage and event deadline. Actions use a database transaction under an application lock, preventing duplicate reward claims from repeated button clicks.
+## Important limitations
 
-## Limitations / security
-- This is an implementation for testing before a prize event, **not a guarantee of zero exploits**. No bot can prevent Discord alt accounts, collusion or outside strategy assistance. Server admins should check eligibility manually for prize winners.
-- Discord ephemeral messages expire and Discord outages can interrupt gameplay; `/forest resume` restores the current step. Game actions do not require the old ephemeral message to remain available.
-- For a larger production deployment, consider PostgreSQL, migrations, operational backups, independent tests and a staging server. This SQLite version is designed for one running bot instance.
-- The forest is a **turn-based risk/reward game**, not a real-time animated RPG. Players' individual adventures differ in ordering and outcomes, but not in available action mechanics.
-- The `@everyone` mention requires both Discord server/channel permissions and the bot's role permission; the signup embed's `@everyone` text alone does not ping users.
-
-## Suggested prelaunch tests
-1. Verify `/forest panel` tags everyone and adds/removes the role on reaction changes.
-2. Test `/forest help`, host access denial, and a normal run in a staging server.
-3. Test duplicate clicks, old-button clicks, disconnect/restart, a player reaching 0 health, escaping early, and a run ending at 40.
-4. Simulate deadlines and tied standings with a test database before running the live event.
+- The code has been syntax checked but **not tested against a live Discord server or Railway**. Test with your own server before advertising the event.
+- The role panel graphic is `panel.png`; encounter images are in `encounter_art/` and must be uploaded with `bot.py`.
+- The database schema is **different from the earlier V2 bot**. Use a **fresh database path** for this version; do not point it at the previous `forest.sqlite3` or overwrite live competition data. If you need to migrate prior runs, plan a separate migration.
+- A Discord ID is not a unique human identity; alt accounts and outside assistance cannot be reliably prevented. Manual moderation may be required.
+- All players receive the same encounter-type counts, but random order and talent/strategy effects can still produce unequal difficulty. This is not a mathematically proven fair competition.
+- `/forest recover` has a limited number of uses; manage supplies and campsite recovery carefully.
