@@ -28,7 +28,7 @@ CHANNEL_ID = int(os.getenv("EVENT_CHANNEL_ID", "0"))
 ROLE_ID = int(os.getenv("ROLE_ID", "1567982021106602065"))
 HOST_IDS = {int(x.strip()) for x in os.getenv("HOST_IDS", "1501587787294703657").split(",") if x.strip()}
 DB_PATH = os.getenv("DATABASE_PATH", "./forest.sqlite3")
-START = dt.datetime(2026, 11, 8, 0, 0, tzinfo=dt.timezone.utc)
+START = dt.datetime(2026, 11, 5, 0, 0, tzinfo=dt.timezone.utc)
 END = dt.datetime(2026, 11, 11, 0, 0, tzinfo=dt.timezone.utc)
 BONUS_HOURS = 24
 MAIN_ROUNDS = 40
