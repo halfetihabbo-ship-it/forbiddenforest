@@ -194,6 +194,15 @@ def scene(s,mode):
     e=discord.Embed(title=f'{title} • {s["step"]+1}/40',description=description,color=0xAD743C)
     e.add_field(name='Resources',value=f'❤️ {s["hp"]}/100  ⚡ {s["en"]}/100  🎒 {s["sup"]}  🧪 {s["potions"]}',inline=False)
     e.add_field(name='Progress',value=f'💎 Artefacts: {s["art"]}/1,000  ⚔️ Challenges: {s["challenge"]}/200\n🎯 Objectives: {sum(objectives(s))}/3  🌿 Talent: {s["talent"] or "Not chosen"}',inline=False)
+    gate_health=max(0,25-s['hp']); gate_energy=max(0,15-s['en'])
+    gate_message='**Final gate (encounter 40): 25+ health AND 15+ energy required to escape.**\n'
+    if gate_health or gate_energy:
+        gate_message+=f'⚠️ Currently below the final-gate threshold: need **+{gate_health} health** and **+{gate_energy} energy**. Plan recovery or consider early escape.'
+    else:
+        gate_message+='✅ You currently meet the escape thresholds. Keep enough resources until the end.'
+    e.add_field(name='🚪 Escape requirements',value=gate_message,inline=False)
+    if s['step'] in (29,34,38,39):
+        e.add_field(name='⚠️ Final gate warning',value='The final gate checks your resources **after** the last action. You will be defeated if health is below 25 or energy below 15. Early escape is available after encounters 30 and 35.',inline=False)
     e.add_field(name='Your choices',value='\n'.join(f'**{i+1}. {o[0]}** — {o[1]}' for i,o in enumerate(options(s))),inline=False)
     if s['step'] in (5,10,15,20,25,30,35) and s['step']<39:
         e.add_field(name='🌫️ Trail ahead',value='Upcoming: **'+', '.join(x.title() for x in s['deck'][s['step']+1:min(40,s['step']+3)])+'**',inline=False)
@@ -327,114 +336,56 @@ async def open_run(interaction,mode):
             s=new_run(interaction.user.id,mode); save(interaction.user.id,mode,s)
     await send_scene(interaction,s,mode)
 
-@forest.command(name='help',description='Detailed guide to the forest, scoring, survival, commands and prizes')
-@app_commands.describe(topic='Which part of the guide would you like to read?')
-@app_commands.choices(topic=[
-    app_commands.Choice(name='Overview & schedule',value='overview'),
-    app_commands.Choice(name='How to play & survival',value='survival'),
-    app_commands.Choice(name='Scoring, objectives & prizes',value='scoring'),
-    app_commands.Choice(name='Commands & host testing',value='commands'),
-    app_commands.Choice(name='Fairness & tiebreakers',value='fairness'),
-])
-async def help_cmd(interaction:discord.Interaction, topic:str='overview'):
-    pages={
-      'overview': (
-        '📅 **Open:** 8 Nov 2026, 00:00 GMT\n'
-        '🏁 **Close:** 11 Nov 2026, 00:00 GMT (72 hours)\n\n'
-        '**Join:** Click 🍁 Join Adventure on the registration panel to receive the event role. '
-        'Use `/forest play` anytime in free-play mode, and `/forest replay` after finishing to try again.\n\n'
-        '**Free play:** Unlimited completed adventures, with separate scores that do not count for prizes. The official event allows one attempt. Your journey has up to **40 encounters**. '
-        'You may pause and use `/forest resume`, but cannot restart an official adventure. '
-        'Each route is individually shuffled using balanced encounter-type quotas.\n\n'
-        '**The objective:** Collect artefacts, complete objectives, manage resources, '
-        'survive the forest and earn the highest final score.\n\n'
-        'Use `/forest help topic:How to play & survival` for the survival rules.'
-      ),
-      'survival': (
-        '**❤️ Health:** Starts at 100. Reaching 0 means defeat immediately.\n'
-        '**⚡ Energy:** Starts at 100. Actions require energy; if you cannot afford a choice, '
-        'select a cheaper option or recover.\n'
-        '**🎒 Supplies:** Starts at 5. Used for safer choices and recovery.\n'
-        '**🧪 Potion:** Starts at 1; can restore energy at campsites.\n\n'
-        '**Recovery:** `/forest recover` spends 1 supply to restore 30 energy, '
-        'up to **2 uses per adventure**. Campsites also offer recovery choices. '
-        'Energy does not regenerate just by waiting. Six camps are spaced across the adventure.\n'
-        '**Emergency:** `/forest emergency` trades 15 health for 30 energy, once per adventure (requires more than 15 health).\n\n'
-        '**🌿 Talent:** At encounter 11 choose Scout, Guardian or Collector. '
-        'Guardian reduces damage; Collector improves certain relic rewards; '
-        'Scout is an information-focused choice.\n\n'
-        '**🚪 Early escape:** After encounters 20, 30 or 35, you can leave and bank your score. '
-        'Escaping ends your run permanently.\n'
-        '**Trail reports:** At encounters 11, 21 and 31 you receive a summary of your choices. Checkpoint hints reveal upcoming encounter types.\n\n'
-        '**☠️ Final Gate:** To escape at encounter 40 you must finish with '
-        '**at least 25 health AND 15 energy**. Reaching 40 without both means defeat, '
-        'even if you still have some health.\n\n'
-        '**Defeat:** Lose 25% of artefact points and receive no escape or remaining-resource bonus. '
-        'An unfinished adventure at the deadline is also treated as defeated.\n\n'
-        '**Strategy tip:** Taking every risky route can leave you too weak to escape; '
-        'taking only easy routes can limit your score.'
-      ),
-      'scoring': (
-        '**🏆 Highest final score wins (maximum 1,750):**\n'
-        '💎 Artefacts: **up to 1,000**\n'
-        '🎯 Objectives: **up to 300**\n'
-        '🧩 Strategic challenges: **up to 200**\n'
-        '🚪 Successful escape: **150**\n'
-        '❤️⚡ Remaining health and energy: **up to 100** (only if escaped)\n\n'
-        '**Three objectives:** Explore at least 4 times; take at least 4 demanding routes; '
-        'collect at least 3 distinct artefact types. Each completed objective awards 100 points.\n\n'
-        '**Prizes:**\n'
-        '🥇 **1st:** 125c + HC Box\n'
-        '🥈 **2nd:** 75c + HC Box\n'
-        '🥉 **3rd:** 50c + HC Box\n\n'
-        '**Important:** The highest artefact total alone does not guarantee first place. '
-        'Survival, challenges and objectives all count.'
-      ),
-      'commands': (
-        '**Player commands**\n'
-        '`/forest help` — Open this guide; select a topic for more details.\n'
-        '`/forest play` — Start or resume an unlimited free-play adventure.\n'
-        '`/forest replay` — Start a new free-play adventure after finishing.\n'
-        '`/forest official` — Your single official adventure during the event dates.\n'
-        '`/forest resume` — Refresh the buttons for your current encounter.\n'
-        '`/forest status` — See progress and current resources.\n'
-        '`/forest inventory` — Check artefacts, potions, objectives and talent.\n'
-        '`/forest recover` — Spend 1 supply for +30 energy (maximum twice).\n'
-        '`/forest emergency` — Once per run, trade 15 health for +30 energy.\n'
-        '`/forest leaderboard` — See results after finalisation.\n'
-        '`/forest tiebreaker` — Play an assigned prize-position tiebreaker.\n\n'
-        '**Host-only commands**\n'
-        '`/forest panel` — Publish the 🍁 registration panel.\n'
-        '`/forest dashboard` — Check participation and event status.\n'
-        '`/forest logs` — Inspect activity logs.\n'
-        '`/forest audit` — Check integrity conditions.\n'
-        '`/forest test` — Play a separate test adventure any time.\n'
-        '`/forest testreset` — Restart your test adventure.\n'
-        '`/forest testjump encounter:30` — Jump to any encounter from 1 to 40.\n'
-        '`/forest recover testing:True` — Recover in test mode.\n'
-        '`/forest emergency testing:True` — Emergency recovery in test mode.'
-      ),
-      'fairness': (
-        '**Fairness rules**\n'
-        '• Unlimited free-play adventures are separate from the one official competition adventure.\n'
-        '• Players receive the same encounter-type quotas, with evenly spaced camps and shuffled other encounters.\n'
-        '• Resource costs and rewards are shown before choosing.\n'
-        '• No speed-based scoring; think before you click.\n'
-        '• Buttons are checked against your saved state to reject stale or duplicate actions.\n'
-        '• Test adventures never contribute to official rankings.\n'
-        '• Using alternate accounts or colluding is against the event rules; '
-        'the bot cannot automatically detect every case.\n\n'
-        '**Ties:** Compare final score, artefact points, completed objectives, '
-        'then remaining health + energy. If a prize-position tie remains, '
-        'eligible players receive a fixed five-question tiebreaker with a 24-hour window.\n\n'
-        '**Deadline:** All official play ends 11 Nov 2026, 00:00 GMT. '
-        'An unfinished run is defeated and scored accordingly.'
-      )
-    }
-    if topic not in pages: topic='overview'
-    labels={'overview':'Start Here','survival':'Survival & Escape','scoring':'Scoring & Prizes','commands':'All Commands','fairness':'Fairness & Ties'}
-    e=discord.Embed(title=f'🌲 The Forbidden Forest — {labels[topic]}',description=pages[topic],color=0xA46A36)
-    e.set_footer(text='Choose another /forest help topic to view the rest of the guide.')
+@forest.command(name='help',description='All Forbidden Forest rules, survival requirements, scoring and commands in one guide')
+async def help_cmd(interaction:discord.Interaction):
+    e=discord.Embed(
+        title='🌲 The Forbidden Forest — Complete Guide',
+        description=(
+            '**40 encounters · One adventure at a time · Every choice matters!**\n'
+            '📅 **Official event:** 8 Nov 2026, 00:00 GMT → 11 Nov 2026, 00:00 GMT\n'
+            '🍁 Click **Join Adventure** on the registration panel for the event role.\n'
+            '🎮 **Free play is available anytime**, with unlimited replays; practice scores never count towards prizes. '
+            'The official competition permits **one attempt per player**.'
+        ),color=0xA46A36)
+    e.add_field(name='🧭 How to Play',value=(
+        'Use `/forest play` to begin free play, choose actions using the encounter buttons, and `/forest resume` to continue later. '
+        'Routes are shuffled but use comparable encounter types. Collect artefacts, complete objectives and protect your resources. '
+        'At encounter 11, choose **Scout**, **Guardian** or **Collector**. '
+        'You may escape early at encounters **20, 30 or 35** to bank your score.'),inline=False)
+    e.add_field(name='❤️ Survival & Recovery',value=(
+        '**Start:** 100 health, 100 energy, 5 supplies and 1 potion. '
+        '**Health at 0 = defeat.** Energy does **not** regenerate by waiting.\n'
+        'Use **one command**, `/forest recover`, and select:\n'
+        '• **Standard:** 1 supply → +30 energy, maximum **2** uses.\n'
+        '• **Emergency:** −15 health → +30 energy, maximum **1** use (must have over 15 health).\n'
+        'Six camps appear at encounters **6, 13, 20, 27, 34 and 39** and offer recovery choices.'),inline=False)
+    e.add_field(name='🚪 Final Gate — Read This!',value=(
+        'To escape after encounter **40**, you must have **at least 25 health AND 15 energy AFTER your final action**. '
+        'Reaching 40/40 does **not** automatically mean you survived. '
+        'If you cannot meet the requirements, consider an earlier escape. '
+        'Defeat removes the escape/resource bonuses and deducts **25% of artefact points**.'),inline=False)
+    e.add_field(name='🏆 Scoring & Prizes',value=(
+        '**Maximum: 1,750 points**\n'
+        '💎 Artefacts 1,000 · 🎯 Objectives 300 · 🧩 Challenges 200 · 🚪 Escape 150 · ❤️⚡ Resources 100.\n'
+        'Objectives: explore 4 times, take 4 demanding routes and collect 3 distinct artefact types.\n'
+        '🥇 **125c + HC Box** · 🥈 **75c + HC Box** · 🥉 **50c + HC Box**'),inline=False)
+    e.add_field(name='🎮 Player Commands',value=(
+        '`/forest play` Start free play · `/forest replay` New adventure after finishing\n'
+        '`/forest official` One prize-eligible run during event dates\n'
+        '`/forest resume` Continue · `/forest status` Check resources\n'
+        '`/forest inventory` Artefacts and objectives · `/forest recover` Recovery options\n'
+        '`/forest leaderboard` Rankings · `/forest tiebreaker` Assigned tie round'),inline=False)
+    e.add_field(name='🛠️ Host Commands',value=(
+        '`/forest panel` Registration · `/forest dashboard` Event overview\n'
+        '`/forest logs` Activity · `/forest audit` Integrity checks\n'
+        '`/forest test` Separate test run · `/forest testreset` Reset test\n'
+        '`/forest testjump encounter:30` Jump to encounter (1–40)'),inline=False)
+    e.add_field(name='⚖️ Fair Play',value=(
+        'Official runs cannot be restarted. No speed scoring; take time to choose. '
+        'Free-play and host-test results do not count towards prizes. '
+        'Ties use artefact points, objectives and remaining resources, followed by a tiebreaker if needed. '
+        'Unfinished official runs at the deadline count as defeated.'),inline=False)
+    e.set_footer(text='All the rules in one command: /forest help')
     await interaction.response.send_message(embed=e,ephemeral=True)
 
 @forest.command(name='play',description='Play anytime with unlimited replays while free-play mode is enabled')
@@ -512,45 +463,43 @@ async def testjump_cmd(interaction:discord.Interaction, encounter:app_commands.R
             return
     await send_scene(interaction,s,'test',f'🧪 Test checkpoint: encounter **{encounter}/40**. Test resources and score have been reset. Official progress is untouched.')
 
-@forest.command(name='recover',description='Spend one supply to restore 30 energy (twice per run)')
-@app_commands.describe(testing='Host only: recover energy in your separate test adventure')
-async def recover_cmd(interaction:discord.Interaction, testing:bool=False):
-    mode='test' if testing else ('free' if FREE_PLAY else 'main')
-    if testing and interaction.user.id not in HOSTS: return await interaction.response.send_message('Host-only testing.',ephemeral=True)
-    if not testing and not FREE_PLAY and phase()!='open': return await interaction.response.send_message('Recovery is only available during the official event.',ephemeral=True)
-    async with mutex:
-        s=get_run(interaction.user.id,mode)
-        if not s or s['finished']: return await interaction.response.send_message('No active adventure.',ephemeral=True)
-        if s['recover_used']>=2 or s['sup']<1 or s['en']>=100:
-            return await interaction.response.send_message('Recovery unavailable: maximum two uses, at least one supply and energy below 100 required.',ephemeral=True)
-        s['sup']-=1; s['en']=min(100,s['en']+30); s['recover_used']+=1; save(interaction.user.id,mode,s)
-    await interaction.response.send_message(f'⚡ Recovered energy: **{s["en"]}/100**. Supplies: **{s["sup"]}**. Recovery uses: **{s["recover_used"]}/2**.',ephemeral=True)
-
-@forest.command(name='emergency',description='Once per adventure: trade 15 health for 30 energy')
-@app_commands.describe(testing='Host only: use in the separate test adventure')
-async def emergency_cmd(interaction:discord.Interaction, testing:bool=False):
+@forest.command(name='recover',description='Restore energy using supplies or health')
+@app_commands.describe(method='Choose standard supplies recovery or emergency health sacrifice',testing='Host only: use your separate test adventure')
+@app_commands.choices(method=[
+    app_commands.Choice(name='Standard: 1 supply → +30 energy (2 uses)',value='standard'),
+    app_commands.Choice(name='Emergency: 15 health → +30 energy (1 use)',value='emergency'),
+])
+async def recover_cmd(interaction:discord.Interaction, method:str='standard', testing:bool=False):
     mode='test' if testing else ('free' if FREE_PLAY else 'main')
     if testing and interaction.user.id not in HOSTS:
         return await interaction.response.send_message('Host-only testing.',ephemeral=True)
     if not testing and not FREE_PLAY and phase()!='open':
-        return await interaction.response.send_message('Emergency recovery is only available during the official event.',ephemeral=True)
+        return await interaction.response.send_message('Recovery is only available during the official event.',ephemeral=True)
     async with mutex:
         s=get_run(interaction.user.id,mode)
         if not s or s['finished']:
             return await interaction.response.send_message('No active adventure.',ephemeral=True)
-        if s.get('emergency_used',0)>=1:
-            return await interaction.response.send_message('You have already used your one emergency recovery.',ephemeral=True)
-        if s['hp']<=15 or s['en']>=100:
-            return await interaction.response.send_message('You need more than 15 health and less than 100 energy to use emergency recovery.',ephemeral=True)
-        s['hp']-=15; s['en']=min(100,s['en']+30); s['emergency_used']=1
+        if method=='standard':
+            if s['recover_used']>=2 or s['sup']<1 or s['en']>=100:
+                return await interaction.response.send_message('Standard recovery requires 1 supply, energy below 100 and an unused recovery (2 maximum).',ephemeral=True)
+            s['sup']-=1; s['en']=min(100,s['en']+30); s['recover_used']+=1
+            detail=f'⚡ Standard recovery: +30 energy for 1 supply. Uses: **{s["recover_used"]}/2**.'
+        elif method=='emergency':
+            if s.get('emergency_used',0)>=1 or s['hp']<=15 or s['en']>=100:
+                return await interaction.response.send_message('Emergency recovery requires more than 15 health, energy below 100 and an unused emergency recovery (1 maximum).',ephemeral=True)
+            s['hp']-=15; s['en']=min(100,s['en']+30); s['emergency_used']=1
+            detail='🆘 Emergency recovery: +30 energy at the cost of 15 health. Uses: **1/1**.'
+        else:
+            return await interaction.response.send_message('Invalid recovery method.',ephemeral=True)
         save(interaction.user.id,mode,s)
-    await interaction.response.send_message(f'🆘 Emergency recovery used! ❤️ {s["hp"]}/100 · ⚡ {s["en"]}/100. This cannot be used again.',ephemeral=True)
+    await interaction.response.send_message(f'{detail}\n❤️ Health: **{s["hp"]}/100** · ⚡ Energy: **{s["en"]}/100** · 🎒 Supplies: **{s["sup"]}**',ephemeral=True)
 
 @forest.command(name='status',description='View your adventure progress')
 async def status_cmd(interaction:discord.Interaction):
     s=get_run(interaction.user.id,'free' if FREE_PLAY else 'main')
     if not s: return await interaction.response.send_message('No adventure yet.',ephemeral=True)
-    await interaction.response.send_message(f'🌲 {s["step"]}/40 encounters | ❤️ {s["hp"]} | ⚡ {s["en"]} | 🎒 {s["sup"]} | 💎 {s["art"]} | 🎯 {sum(objectives(s))}/3 | {"Finished" if s["finished"] else "Active"}',ephemeral=True)
+    warning='⚠️ You are currently below the final-gate threshold.' if s['hp']<25 or s['en']<15 else '✅ Currently above the final-gate threshold.'
+    await interaction.response.send_message(f'🌲 {s["step"]}/40 encounters | ❤️ {s["hp"]} | ⚡ {s["en"]} | 🎒 {s["sup"]} | 💎 {s["art"]} | 🎯 {sum(objectives(s))}/3 | {"Finished" if s["finished"] else "Active"}\n🚪 Final gate: **25+ health AND 15+ energy** after encounter 40. {warning}',ephemeral=True)
 
 @forest.command(name='inventory',description='See your artefacts, potions and objectives')
 async def inventory_cmd(interaction:discord.Interaction):
@@ -617,7 +566,7 @@ async def panel_cmd(interaction:discord.Interaction):
         '🗓️ **Closes:** 11 Nov 2026, 12:00 AM GMT\n'
         '📖 `/forest help` for complete rules and commands. Free-play scores are not eligible for prizes.\n\n'
         '**🍁 Join Adventure** assigns the role. **Leave Signup** removes it. Reactions also work if enabled.\n'
-        '**Survival:** Six spaced camps and limited recovery help you prepare. The final gate requires 25 health and 15 energy.'),color=0xB67835)
+        '**Survival:** Six spaced camps and limited recovery help you prepare. To escape at encounter 40, you MUST have **25+ health AND 15+ energy after your final action**. Earlier escape opportunities are available after encounters 20, 30 and 35.'),color=0xB67835)
     path=Path(__file__).parent/'panel.png'
     file=discord.File(path,filename='panel.png') if path.exists() else None
     if file: e.set_image(url='attachment://panel.png')
